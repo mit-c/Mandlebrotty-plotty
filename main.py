@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import numpy as np
+from multiprocessing import Pool
+from matplotlib.animation import FuncAnimation
 
 plt.style.use("seaborn-pastel")
 
@@ -8,7 +9,29 @@ fig = plt.figure()
 ax = plt.axes()
 
 
+def inner_loops(num_its, x, imag_range, interesting_point, theta):
+    # This takes imag_range (an iterable) and outputs an iterable for each one.
+    # It should therefore just output a colour and that should get mapped to an iterable which I can store.
+
+        y = imag_range
+        xnew, ynew = rotate([x, y], interesting_point, theta)
+        c = complex(xnew, ynew)
+        new_z = complex(0, 0)
+        for k in range(num_its):
+            new_z = new_z * new_z + c
+            if abs(new_z) > 4:
+                break
+
+        out_colour = k / num_its
+        return out_colour
+
+
+
 def mandlebrot(num_its, real_range, imag_range, interesting_point, theta):
+    '''
+    TODO parrellisation. Need to create two Pool objects which replace the two for loops.
+    I will start with the inner loop first.
+    '''
     width = len(real_range)
     height = len(imag_range)
     out_grid = [[0 for i in range(len(real_range))] for j in range(len(imag_range))]
@@ -24,12 +47,12 @@ def mandlebrot(num_its, real_range, imag_range, interesting_point, theta):
                 new_z = new_z * new_z + c
                 if abs(new_z) > 4:
                     break
-                out_grid[j][i] = k / num_its
+            out_grid[j][i] = k / num_its
     return out_grid
 
 
-def animate(i, zoom_list_real, zoom_list_imag, interesting_point, theta_list):
-    print(i)
+def animate(i, zoom_list_real, zoom_list_imag, interesting_point, theta_list, it_multiplier):
+    print("Frame number:", i + 1)
     ax.clear()
     ax.tick_params(axis="both",
                    which="both",
@@ -39,7 +62,7 @@ def animate(i, zoom_list_real, zoom_list_imag, interesting_point, theta_list):
                    labelbottom=False,
                    labelleft=False)  # learning what this stuff means (I think a lot is unnecessary).
 
-    out_grid = mandlebrot(num_its=i + 20,
+    out_grid = mandlebrot(num_its=int(i * it_multiplier + 10),
                           real_range=zoom_list_real[i],
                           imag_range=zoom_list_imag[i],
                           interesting_point=interesting_point,
@@ -81,20 +104,23 @@ def zoom(real_range, imag_range, zoom_factor, interesting_point):
 def main():
     width = 300
     height = 300
-    theta_bool = True
-    num_frames = 30
-    zoom_factor = 0.8
-    interesting_point = [-0.74, 0.36]  # [real, complex]
+    num_frames = 40  # total number of frames in gif
+    theta_bool = True  # if set to False no rotation will be used -- makes finding interesting point easier.
+    zoom_factor = 0.8  # how much zoom per frame e.g. 0.8 means zoom in by 20%
+    it_multiplier = 10  # I'm assuming relationship between num_its and frames is linear e.g. i*it_multiplier + const.
+    interesting_point = [-0.7764, 0.1375]  # [-0.7285, 0.3583]  # [real, complex]
+    print("zoom point: ", interesting_point)
+    print("total frames: ", num_frames)
     initial_range = [4, 2]
-    # preprocess zoom ranges
+    # preprocessing lists for zoom.
     real_range = [interesting_point[0] - initial_range[0] / 2 + initial_range[0] * i / width for i in
-                  range(width)]  # interesting point - half of range + range add.
+                  range(width)]  # interesting point - half of range + range addition.
     imag_range = [interesting_point[1] - initial_range[1] / 2 + initial_range[1] * j / height for j in range(height)]
     zoom_list_real = [real_range]
     zoom_list_imag = [imag_range]
 
     theta_list = [0]
-    theta_add = 2 * np.pi / (6 * num_frames)
+    theta_add = 2 * np.pi / (4 * num_frames)
     theta = 0
     for i in range(num_frames - 1):
         real_range, imag_range = zoom(real_range, imag_range, zoom_factor, interesting_point)
@@ -107,7 +133,7 @@ def main():
         theta_list = [0] * num_frames
 
     mandlebrot_ani = FuncAnimation(fig, animate, frames=num_frames, interval=120, blit=True,
-                                   fargs=(zoom_list_real, zoom_list_imag, interesting_point, theta_list))
+                                   fargs=(zoom_list_real, zoom_list_imag, interesting_point, theta_list, it_multiplier))
     mandlebrot_ani.save("mandlebrot_plot.gif", writer="imagemagick")
 
 
