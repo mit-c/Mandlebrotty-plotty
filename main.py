@@ -2,9 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from multiprocessing import Pool
 from matplotlib.animation import FuncAnimation
+from matplotlib.animation import writers
+from matplotlib.colors import DivergingNorm
 from functools import partial
 
-# TODO: There is something causing rotate to stretch images.
+# TODO: There is an issue with trying to create gif with non-square dimensions (fix)
 plt.style.use("seaborn-pastel")
 
 fig = plt.figure()
@@ -14,7 +16,7 @@ ax = plt.axes()
 def inner_loop(real_range, num_its, y, interesting_point, theta):
     # This takes real_range (an iterable) and outputs an iterable for each one.
     # It should therefore just output a colour and that should get mapped to an iterable which I can store.
-
+   
     x = real_range
     xnew, ynew = rotate((x, y), interesting_point, theta)
     c = complex(xnew, ynew)
@@ -25,27 +27,38 @@ def inner_loop(real_range, num_its, y, interesting_point, theta):
             break
 
     out_colour = k / num_its
-    return out_colour
+    
+    return (out_colour)
 
 
 def mandlebrot(num_its, real_range, imag_range, interesting_point, theta):
+   
     height = len(imag_range)
-    out_grid = [0 for j in range(len(real_range))]
+    out_grid = [0 for j in range(len(imag_range))] 
     pool = Pool(processes=4)  # TODO probably should preprocess rotation matrix.
+
     for j in range(height):
+        ''' Both row and column are 1500 long this should not happen'''
         just_inner_loop = partial(inner_loop, num_its=num_its, y=imag_range[j], interesting_point=interesting_point,
                                   theta=theta)
-        row = pool.map(just_inner_loop, real_range)
+        
+        row = pool.map(just_inner_loop, real_range)   
         out_grid[j] = row
-
+    
+        
+    
     pool.close()
     pool.join()
+
     # The code below normalises the colour will either look good or terrible.
     min_val = min(min(out_grid))
     max_val = max(max(out_grid))
+
+   
     if max_val - min_val != 0:
         new_out_grid = [[(val - min_val) / (max_val - min_val) for val in out_grid_row] for out_grid_row in out_grid]
         return new_out_grid
+
     return out_grid
 
 
@@ -67,9 +80,9 @@ def animate(i, zoom_list_real, zoom_list_imag, interesting_point, theta_list, it
                           imag_range=zoom_list_imag[i],
                           interesting_point=interesting_point,
                           theta=theta_list[i])
-
     img = ax.imshow(out_grid,
                     origin='lower')
+
     return [img]
 
 
@@ -103,16 +116,16 @@ def zoom(real_range, imag_range, zoom_factor, interesting_point):
 
 
 def main():
-    width = 300
-    height = 300
-    num_frames = 120  # total number of frames in gif
+    width = 2000
+    height = 500
+    num_frames = 1  # total number of frames in gif
     theta_bool = True  # if set to False no rotation will be used -- makes finding interesting point easier.
     zoom_factor = 0.8  # how much zoom per frame e.g. 0.8 means zoom in by 20%
     it_mult = 5  # I think the relationship between zoom factor and it_power is bigger than linear (testing quadratic).
-    interesting_point = [-0.77568377, 0.13646737]  # [-0.7285, 0.3583]  # [real, complex]
+    interesting_point = [-1,0] #[-0.77568377, 0.13646737]  # [-0.7285, 0.3583]  # [real, complex]
     print("zoom point: ", interesting_point)
     print("total frames: ", num_frames)
-    initial_range = [4, 2]
+    initial_range = [4, 2.5]
     # preprocessing lists for zoom.
     real_range = [interesting_point[0] - initial_range[0] / 2 + initial_range[0] * i / width for i in
                   range(width)]  # interesting point - half of range + range addition.
@@ -135,18 +148,8 @@ def main():
 
     mandlebrot_ani = FuncAnimation(fig, animate, frames=num_frames, interval=120, blit=True,
                                    fargs=(zoom_list_real, zoom_list_imag, interesting_point, theta_list, it_mult))
-    mandlebrot_ani.save("mandlebrot_plot.gif", writer="imagemagick")
-    '''
-    index = -1
-    imag_range = zoom_list_imag[index]
-    real_range = zoom_list_real[index]
-    theta_test = theta_list[index]
-    out_grid=mandlebrot(num_its=600, real_range=real_range,imag_range=imag_range,interesting_point=interesting_point,theta=theta_test)
-    print(np.sin(theta_test), np.cos(theta_test))
-    plt.imshow(out_grid)
-    plt.show()
-    '''
-
+    mandlebrot_ani.save("mandlebrot_plot.gif",dpi=1000)
+  
 
 if __name__ == "__main__":
     main()
